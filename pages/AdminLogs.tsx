@@ -12,7 +12,7 @@ export const AdminLogs: React.FC = () => {
     const fetchLogs = async () => {
         setLoading(true);
         try {
-            const res = await fetch('http://localhost:4000/api/logs');
+            const res = await fetch('/api/logs');
             if (res.ok) {
                 const data = await res.json();
                 setLogs(data);
@@ -30,7 +30,7 @@ export const AdminLogs: React.FC = () => {
 
     const deleteLog = async (id: number) => {
         try {
-            const res = await fetch(`http://localhost:4000/api/logs/${id}`, { method: 'DELETE' });
+            const res = await fetch(`/api/logs/${id}`, { method: 'DELETE' });
             if (res.ok) fetchLogs();
         } catch (e) {
             console.error('Failed to delete log', e);
@@ -40,7 +40,7 @@ export const AdminLogs: React.FC = () => {
     const clearAllLogs = async () => {
         if (!window.confirm('Are you sure you want to clear all system logs?')) return;
         try {
-            const res = await fetch('http://localhost:4000/api/logs', { method: 'DELETE' });
+            const res = await fetch('/api/logs', { method: 'DELETE' });
             if (res.ok) fetchLogs();
         } catch (e) {
             console.error('Failed to clear logs', e);

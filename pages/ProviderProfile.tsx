@@ -42,7 +42,7 @@ export const ProviderProfile: React.FC = () => {
     useEffect(() => {
         const fetchProvider = async () => {
             try {
-                const res = await fetch(`http://localhost:4000/api/users`);
+                const res = await fetch(`/api/users`);
                 if (res.ok) {
                     const users = await res.json();
                     const foundProvider = users.find((u: any) => u.id === parseInt(id || '0'));
@@ -110,7 +110,7 @@ export const ProviderProfile: React.FC = () => {
         setRequestStatus('idle');
 
         try {
-            const res = await fetch('http://localhost:4000/api/contact-requests', {
+            const res = await fetch('/api/contact-requests', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

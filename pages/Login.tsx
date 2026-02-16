@@ -17,7 +17,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     if (!email || !password || !role) return alert('Please fill all fields.');
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:4000/api/login', {
+      const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -60,14 +60,14 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     // Store the selected role in sessionStorage so we can use it after OAuth callback
     if (role) sessionStorage.setItem('oauth_role', role);
     // Redirect to backend Google OAuth endpoint
-    window.location.href = `http://localhost:4000/api/auth/google?role=${role}`;
+    window.location.href = `/api/auth/google?role=${role}`;
   };
 
   const handleFacebookSignIn = () => {
     // Store the selected role in sessionStorage so we can use it after OAuth callback
     if (role) sessionStorage.setItem('oauth_role', role);
     // Redirect to backend Facebook OAuth endpoint
-    window.location.href = 'http://localhost:4000/api/auth/facebook';
+    window.location.href = '/api/auth/facebook';
   };
 
   return (

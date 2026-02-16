@@ -18,7 +18,7 @@ const Register: React.FC = () => {
 
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:4000/api/register', {
+      const res = await fetch('/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: fullName, email, password, role: role.toUpperCase(), phone_number: phoneNumber }),
@@ -38,14 +38,14 @@ const Register: React.FC = () => {
     // Store the selected role in sessionStorage so we can use it after OAuth callback
     if (role) sessionStorage.setItem('oauth_role', role);
     // Redirect to backend Google OAuth endpoint
-    window.location.href = 'http://localhost:4000/api/auth/google';
+    window.location.href = '/api/auth/google';
   };
 
   const handleFacebookSignUp = () => {
     // Store the selected role in sessionStorage so we can use it after OAuth callback
     if (role) sessionStorage.setItem('oauth_role', role);
     // Redirect to backend Facebook OAuth endpoint
-    window.location.href = 'http://localhost:4000/api/auth/facebook';
+    window.location.href = '/api/auth/facebook';
   };
 
   return (

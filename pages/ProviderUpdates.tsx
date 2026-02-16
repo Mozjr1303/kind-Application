@@ -25,7 +25,7 @@ export const ProviderUpdates = () => {
 
         try {
             // Fetch contact requests as notifications
-            const res = await fetch(`http://localhost:4000/api/contact-requests/provider/${userId}`);
+            const res = await fetch(`/api/contact-requests/provider/${userId}`);
             if (res.ok) {
                 const requests = await res.json();
 

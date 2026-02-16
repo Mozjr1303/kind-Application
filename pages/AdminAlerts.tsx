@@ -65,11 +65,11 @@ export const AdminAlerts: React.FC = () => {
         setLoading(true);
         try {
             // Fetch system alerts
-            const alertsRes = await fetch('http://localhost:4000/api/alerts');
+            const alertsRes = await fetch('/api/alerts');
             const systemAlerts = await alertsRes.json();
 
             // Fetch pending provider count
-            const providersRes = await fetch('http://localhost:4000/api/admin/pending-providers');
+            const providersRes = await fetch('/api/admin/pending-providers');
             const pendingProviders = await providersRes.json();
             setPendingCount(pendingProviders.length);
 
@@ -149,7 +149,7 @@ export const AdminAlerts: React.FC = () => {
     const markAsRead = async (id: number) => {
         if (id === 0) return; // Can't mark virtual alert as read here
         try {
-            await fetch(`http://localhost:4000/api/alerts/${id}/read`, { method: 'PUT' });
+            await fetch(`/api/alerts/${id}/read`, { method: 'PUT' });
             fetchAlertData();
         } catch (e) {
             console.error('Failed to mark as read', e);
@@ -158,7 +158,7 @@ export const AdminAlerts: React.FC = () => {
 
     const markAllRead = async () => {
         try {
-            await fetch(`http://localhost:4000/api/alerts/read-all`, { method: 'PUT' });
+            await fetch(`/api/alerts/read-all`, { method: 'PUT' });
             fetchAlertData();
         } catch (e) {
             console.error('Failed to mark all read', e);
@@ -168,7 +168,7 @@ export const AdminAlerts: React.FC = () => {
     const deleteAlert = async (id: number) => {
         if (id === 0) return; // Can't dismiss virtual alert like this
         try {
-            await fetch(`http://localhost:4000/api/alerts/${id}`, { method: 'DELETE' });
+            await fetch(`/api/alerts/${id}`, { method: 'DELETE' });
             fetchAlertData();
         } catch (e) {
             console.error('Failed to delete alert', e);
@@ -178,7 +178,7 @@ export const AdminAlerts: React.FC = () => {
     const clearAllAlerts = async () => {
         if (!window.confirm('Delete all alerts? This cannot be undone.')) return;
         try {
-            await fetch(`http://localhost:4000/api/alerts`, { method: 'DELETE' });
+            await fetch(`/api/alerts`, { method: 'DELETE' });
             fetchAlertData();
         } catch (e) {
             console.error('Failed to clear alerts', e);

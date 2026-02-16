@@ -44,7 +44,7 @@ export const AdminDashboard: React.FC = () => {
       if (!isBackground) setLoadingUsers(true);
       setUsersError(null);
       try {
-        const res = await fetch('http://localhost:4000/api/users');
+        const res = await fetch('/api/users');
         if (!res.ok) throw new Error('Failed to fetch users');
         const data = await res.json();
         setUsers(data || []);
@@ -59,7 +59,7 @@ export const AdminDashboard: React.FC = () => {
     const fetchPendingProviders = async (isBackground = false) => {
       if (!isBackground) setLoadingPending(true);
       try {
-        const res = await fetch('http://localhost:4000/api/admin/pending-providers');
+        const res = await fetch('/api/admin/pending-providers');
         if (res.ok) {
           const data = await res.json();
           // avoid unnecessary re-renders if data is same (deep check omitted for simplicity, relying on React)
@@ -75,7 +75,7 @@ export const AdminDashboard: React.FC = () => {
     const fetchContactRequests = async (isBackground = false) => {
       if (!isBackground) setLoadingRequests(true);
       try {
-        const res = await fetch('http://localhost:4000/api/contact-requests');
+        const res = await fetch('/api/contact-requests');
         if (res.ok) {
           const data = await res.json();
           setContactRequests(data || []);
@@ -104,7 +104,7 @@ export const AdminDashboard: React.FC = () => {
 
   const handleProviderStatus = async (id: number | string, status: 'active' | 'rejected') => {
     try {
-      const res = await fetch(`http://localhost:4000/api/admin/providers/${id}/status`, {
+      const res = await fetch(`/api/admin/providers/${id}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status })
@@ -112,13 +112,13 @@ export const AdminDashboard: React.FC = () => {
 
       if (res.ok) {
         // Refresh pending list
-        const refreshRes = await fetch('http://localhost:4000/api/admin/pending-providers');
+        const refreshRes = await fetch('/api/admin/pending-providers');
         if (refreshRes.ok) {
           const data = await refreshRes.json();
           setPendingProviders(data || []);
         }
         // Refresh all users list
-        const usersRes = await fetch('http://localhost:4000/api/users');
+        const usersRes = await fetch('/api/users');
         if (usersRes.ok) {
           const data = await usersRes.json();
           setUsers(data || []);
@@ -132,7 +132,7 @@ export const AdminDashboard: React.FC = () => {
   const handleDeleteUser = async (userId: number | string) => {
     if (!window.confirm('Are you sure you want to permanently delete this user account? This cannot be undone.')) return;
     try {
-      const res = await fetch(`http://localhost:4000/api/users/${userId}`, { method: 'DELETE' });
+      const res = await fetch(`/api/users/${userId}`, { method: 'DELETE' });
       if (res.ok) {
         setPendingProviders(prev => prev.filter(p => p.id !== userId));
         setUsers(prev => prev.filter(u => u.id !== userId));
@@ -144,14 +144,14 @@ export const AdminDashboard: React.FC = () => {
 
   const handleContactRequestStatus = async (id: number | string, status: 'approved' | 'rejected') => {
     try {
-      const res = await fetch(`http://localhost:4000/api/contact-requests/${id}`, {
+      const res = await fetch(`/api/contact-requests/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status })
       });
 
       if (res.ok) {
-        const refreshRes = await fetch('http://localhost:4000/api/contact-requests');
+        const refreshRes = await fetch('/api/contact-requests');
         if (refreshRes.ok) {
           const data = await refreshRes.json();
           setContactRequests(data || []);
@@ -165,7 +165,7 @@ export const AdminDashboard: React.FC = () => {
   const handleDeleteContactRequest = async (id: number | string) => {
     if (!window.confirm('Delete this request? This action cannot be undone.')) return;
     try {
-      const res = await fetch(`http://localhost:4000/api/contact-requests/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/contact-requests/${id}`, { method: 'DELETE' });
       if (res.ok) {
         setContactRequests(prev => prev.filter(r => r.id !== id));
       }
@@ -191,7 +191,7 @@ export const AdminDashboard: React.FC = () => {
                 const fetchPendingProviders = async () => {
                   setLoadingPending(true);
                   try {
-                    const res = await fetch('http://localhost:4000/api/admin/pending-providers');
+                    const res = await fetch('/api/admin/pending-providers');
                     if (res.ok) {
                       const data = await res.json();
                       console.log('Refreshed pending providers:', data);

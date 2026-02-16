@@ -150,7 +150,7 @@ export const ClientDashboard: React.FC = () => {
 
       const fetchConversations = async () => {
          try {
-            const res = await fetch(`http://localhost:4000/api/contact-requests/client/${userId}`);
+            const res = await fetch(`/api/contact-requests/client/${userId}`);
             if (res.ok) {
                const data = await res.json();
                const list = Array.isArray(data) ? data : [];
@@ -220,7 +220,7 @@ export const ClientDashboard: React.FC = () => {
 
       // Fetch messages for this conversation
       try {
-         const res = await fetch(`http://localhost:4000/api/messages/${conv.id}`);
+         const res = await fetch(`/api/messages/${conv.id}`);
          if (res.ok) {
             const data = await res.json();
             const fetchedMessages = Array.isArray(data) ? data : [];
@@ -256,7 +256,7 @@ export const ClientDashboard: React.FC = () => {
 
    const openProviderDetails = async (conv: any) => {
       try {
-         const res = await fetch(`http://localhost:4000/api/users/${conv.provider_id}`);
+         const res = await fetch(`/api/users/${conv.provider_id}`);
          if (res.ok) {
             const provider = await res.json();
             setSelectedProvider(provider);
@@ -275,7 +275,7 @@ export const ClientDashboard: React.FC = () => {
       if (!userId || !userName) return;
 
       try {
-         const res = await fetch('http://localhost:4000/api/messages', {
+         const res = await fetch('/api/messages', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -321,7 +321,7 @@ export const ClientDashboard: React.FC = () => {
          if (service) params.append('service', service);
          if (loc) params.append('location', loc);
 
-         const res = await fetch(`http://localhost:4000/api/providers?${params.toString()}`);
+         const res = await fetch(`/api/providers?${params.toString()}`);
          if (res.ok) {
             const data = await res.json();
             setSearchResults(data);

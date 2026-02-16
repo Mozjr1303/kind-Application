@@ -92,7 +92,7 @@ const OAuthCallback: React.FC<OAuthCallbackProps> = ({ onLogin }) => {
 
     setSubmitting(true);
     try {
-      const res = await fetch('http://localhost:4000/api/auth/oauth-complete', {
+      const res = await fetch('/api/auth/oauth-complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ registerToken, role: selectedRole, phone_number: phoneNumber })

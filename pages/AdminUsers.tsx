@@ -24,7 +24,7 @@ export const AdminUsers: React.FC = () => {
             if (!isBackground) setLoading(true);
             setError(null);
             try {
-                const res = await fetch('http://localhost:4000/api/users');
+                const res = await fetch('/api/users');
                 if (!res.ok) throw new Error('Failed to fetch users');
                 const data = await res.json();
                 setUsers(data || []);
@@ -51,7 +51,7 @@ export const AdminUsers: React.FC = () => {
         if (!window.confirm('Are you sure you want to remove this provider? This action cannot be undone.')) return;
 
         try {
-            const res = await fetch(`http://localhost:4000/api/users/${userId}`, {
+            const res = await fetch(`/api/users/${userId}`, {
                 method: 'DELETE',
             });
 
