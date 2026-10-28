@@ -1,191 +1,111 @@
-# Kind Service Platform Documentation
+# KIND Service Platform Documentation
 
-## 1. Project Overview
+## 1. Overview
 
-The **Kind Service Platform** is a comprehensive application designed to connect clients with service providers. It features a web-based frontend for clients and administrators, a backend server handling data and logic, and a mobile application for on-the-go access.
+KIND is a web application prototype for a local-services marketplace. It is intended to help clients find and contact service providers and to let administrators review provider registrations. The UI includes client, provider, and admin areas. Some product areas (including bookings, payments, reviews, and provider discovery) remain incomplete or use mock data.
 
-**Key Features:**
-- **User Roles:** Clients, Providers, and Administrators.
-- **Provider Discovery:** Clients can search for providers based on service type and location.
-- **Service Requests:** Clients can initiate contact requests with providers.
-- **Real-time Messaging:** Integrated chat functionality between clients and providers.
-- **Admin Dashboard:** Administrators can oversee provider registrations and approve/reject profiles.
-- **SMS Notifications:** Automated SMS alerts for critical actions (registration, approval, requests) using Africa's Talking.
-- **Authentication:** Secure JWT-based authentication with support for Google and Facebook OAuth.
+The current server persists application data in Supabase. The SQLite utilities in `server/legacy/` belong to an older implementation and are not used by the active API.
 
----
+## 2. Technology
 
-## 2. Technology Stack
+### Web
 
-### Frontend (Web)
-- **Framework:** React 19
-- **Build Tool:** Vite 6
-- **Language:** TypeScript
-- **Routing:** React Router DOM v7
-- **UI Components:** Lucide React (Icons), OGL (WebGL)
-- **Visualization:** Recharts
-- **Styling:** CSS / Tailwind CSS (Project structure implies Tailwind usage)
+- React 19 and TypeScript
+- Vite 6, development port `3000`
+- React Router DOM 7 with `HashRouter`
+- Lucide React, Recharts, OGL, and GSAP
+- CSS and Tailwind utility classes; Tailwind is loaded from the CDN in `index.html`
 
-### Backend (API)
-- **Runtime:** Node.js
-- **Framework:** Express.js
-- **Database:** SQLite (file-based `data.db`)
-- **Authentication:**
-  - `jsonwebtoken` (JWT) for session management.
-  - `bcryptjs` for password hashing.
-  - `passport` with Google & Facebook strategies for OAuth.
-- **Notifications:** Africa's Talking API for SMS.
+### API
 
-### Mobile (`/expo-app`)
-- **Framework:** React Native with Expo (SDK 54)
-- **Language:** TypeScript
-- **Platform:** Android, iOS, Web
+- Node.js and Express 4, default port `4000`
+- Supabase JavaScript client for database access
+- `bcryptjs` for password hashing; `jsonwebtoken` for API tokens
+- Passport Google and Facebook OAuth strategies
+- Africa's Talking for SMS notifications
 
----
+### Mobile
 
-## 3. Project Structure
+`expo-app/` is configured for Expo, React Native, and Android/iOS/web targets, but its `App.tsx` is still the default Expo starter screen; it is not an implemented KIND client.
 
-```
-kind-service-platform/
-├── components/          # Reusable React UI components
-├── pages/               # Frontend application pages/routes
-├── public/              # Static assets
-├── server/              # Backend Express application
-│   ├── index.js         # Main server entry point
-│   ├── data.db          # SQLite database file
-│   └── package.json     # Backend dependencies
-├── expo-app/            # Mobile application source
-│   ├── App.tsx          # Mobile app entry point
-│   └── app.json         # Expo configuration
-├── App.tsx              # Main Web App component
-├── package.json         # Frontend dependencies
-└── vite.config.ts       # Vite build configuration
-```
+## 3. Repository layout and startup
 
----
+- `App.tsx`, `index.tsx`, `index.css`, `vite.config.ts`: web app root and Vite setup.
+- `pages/`: public, client, provider, and admin screens.
+- `components/`: shared dashboard layout, cards, and visual effects.
+- `server/index.js`: Express API entry point and routes.
+- `server/supabase.js`: Supabase client setup.
+- `supabase_schema.sql`: database table definitions and system-user seed.
+- `public/`: static assets, PWA manifest, styles, and service worker.
+- `server/legacy/`: inactive SQLite scripts, retained for reference.
 
-## 4. Backend Architecture & API
+The web app mounts from `index.tsx` and routes in `App.tsx`. The API loads `server/.env`, checks required variables, then starts Express. The Vite dev server listens on port `3000` and proxies `/api` requests to the API at port `4000`.
 
-The backend runs on **port 4000** by default.
+## 4. Database and data
 
-### Database Schema (SQLite)
+The schema in `supabase_schema.sql` defines:
 
-1.  **Users Table (`users`)**
-    *   `id`: INTEGER PRIMARY KEY
-    *   `name`, `email`, `password`: User credentials.
-    *   `role`: 'CLIENT', 'PROVIDER', 'ADMIN'.
-    *   `status`: 'active', 'pending' (for providers), 'rejected'.
-    *   `service`, `location`: Specific to providers.
-    *   `phone_number`: Contact number.
+- `users`: accounts and provider profile attributes.
+- `contact_requests`: client-to-provider requests and status.
+- `messages`: messages attached to a contact request.
+- `alerts`: admin alert records.
+- `logs`: activity log records.
 
-2.  **Contact Requests (`contact_requests`)**
-    *   Links Clients and Providers.
-    *   `status`: Defaults to 'approved' (Auto-approved logic implemented).
+The schema creates the system user used for automated messages. It does not seed an administrator account; provision one with `server/create_admin.js`.
 
-3.  **Messages (`messages`)**
-    *   Stores chat history for contact requests.
+The API currently has registration/login, `/api/me`, provider approval, user management, contact request, message, alert, and log routes in `server/index.js`. The client UI also calls provider-search and individual-user routes that are not present in the current server implementation. Some admin alert and deletion controls likewise target routes that are not implemented. Check the server routes before relying on those UI operations.
 
-### Key API Endpoints
+The checked-in schema does not define Supabase row-level-security policies. Confirm the project's RLS and access policies before deployment.
 
-#### Authentication
-- `POST /api/register`: Register a new user. Triggers SMS alert for new providers.
-- `POST /api/login`: Authenticate and receive JWT.
-- `GET /api/me`: Get current user profile.
-- `GET /api/auth/google`, `GET /api/auth/facebook`: OAuth initiation.
+## 5. Authentication and integrations
 
-#### Providers & Users
-- `GET /api/providers`: Search active providers by service/location.
-- `GET /api/users`: List all users (Admin).
-- `GET /api/admin/pending-providers`: List providers awaiting approval.
-- `PUT /api/admin/providers/:id/status`: Approve or reject a provider. Triggers SMS.
+Email/password registration hashes the password with `bcryptjs`; login returns a signed JWT and a `user` object. Google and Facebook OAuth require provider credentials and callback URLs configured in those provider consoles. The web client stores the token and user data in browser `localStorage`.
 
-#### Service Interaction
-- `POST /api/contact-requests`: Create a request (Auto-approved).
-- `GET /api/contact-requests/client/:clientId`: Get client's requests.
-- `GET /api/contact-requests/provider/:providerId`: Get provider's requests.
-- `POST /api/messages`: Send a chat message.
-- `GET /api/messages/:contactRequestId`: Retrieve chat history.
+The server requires:
 
----
+- `JWT_SECRET`
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
 
-## 5. Setup & Installation
+Optional integrations:
 
-### Prerequisites
-- Node.js (v16+ recommended)
-- npm or yarn
+- Google OAuth: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
+- Facebook OAuth: `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET`
+- Africa's Talking SMS: `AFRICASTALKING_API_KEY`, `AFRICASTALKING_USERNAME`; `ADMIN_PHONE_NUMBER` is used for admin notifications.
 
-### 1. Backend Setup
-1.  Navigate to the server directory:
-    ```bash
-    cd server
-    ```
-2.  Install dependencies:
-    ```bash
-    npm install
-    ```
-3.  Configure Environment Variables:
-    Create a `.env` file in the `server` directory with the following:
-    ```env
-    PORT=4000
-    JWT_SECRET=your_jwt_secret
-    
-    # Africa's Talking Credentials
-    AFRICASTALKING_API_KEY=your_api_key
-    AFRICASTALKING_USERNAME=your_username
-    ADMIN_PHONE_NUMBER=your_admin_phone
-    
-    # OAuth Credentials (Optional for local dev)
-    GOOGLE_CLIENT_ID=...
-    GOOGLE_CLIENT_SECRET=...
-    FACEBOOK_APP_ID=...
-    FACEBOOK_APP_SECRET=...
-    ```
-4.  Start the server:
-    ```bash
-    npm start
-    ```
-    The server will initialize the SQLite database automatically.
+The admin provisioning script additionally requires `ADMIN_NAME`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD`. The service-role key must remain server-side and must not be committed or exposed to the browser.
 
-### 2. Frontend (Web) Setup
-1.  Navigate to the root directory:
-    ```bash
-    cd ..
-    ```
-2.  Install dependencies:
-    ```bash
-    npm install
-    ```
-3.  Start the development server:
-    ```bash
-    npm run dev
-    ```
-    The app will run at `http://localhost:5173`.
+All supported names and blank example values are listed in `server/.env.example`. Copy it to `server/.env` and fill only the values needed for the chosen features. OAuth test and legacy SQLite reset variables in that template are only for the corresponding scripts.
 
-### 3. Mobile App Setup
-1.  Navigate to the expo app directory:
-    ```bash
-    cd expo-app
-    ```
-2.  Install dependencies:
-    ```bash
-    npm install
-    ```
-3.  Start the Expo server:
-    ```bash
-    npx expo start
-    ```
-    Scan the QR code with your phone (using Expo Go) or run on an emulator.
+## 6. Setup
 
----
+1. Create a Supabase project.
+2. Run `supabase_schema.sql` in the Supabase SQL editor.
+3. Copy `server/.env.example` to `server/.env`; set `JWT_SECRET`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `ALLOWED_ORIGINS`.
+4. Optionally provision an admin by setting `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_NAME`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD`, then run `node create_admin.js` from `server/`.
+5. Install and start the web application from the repository root:
 
-## 6. Mobile Application (`/expo-app`)
+   ```sh
+   npm install
+   npm run dev
+   ```
 
-The mobile application is built with **Expo**.
-- **`App.tsx`**: The main entry point. Modify this file to build out the mobile UI.
-- **Connection to Backend**: Ensure the mobile app points to your computer's local IP address (e.g., `http://192.168.1.5:4000`) instead of `localhost` to connect to the backend while running on a device.
+   Open `http://localhost:3000`.
 
-## 7. Troubleshooting
+6. In a separate terminal, install and start the API:
 
-- **Database Errors:** If you encounter SQLite errors, ensure the `server/data.db` file has write permissions or delete it to let the server recreate it.
-- **Network Issues:** If the frontend cannot talk to the backend, verify the `PORT` in `.env` matches the frontend API calls (default is 4000).
-- **SMS Failures:** Check your Africa's Talking API credentials and ensure you have sufficient balance.
+   ```sh
+   cd server
+   npm install
+   npm start
+   ```
+
+   The API is available at `http://localhost:4000` unless `PORT` overrides it. The equivalent root command is `npm run start:server`.
+
+## 7. Testing and deployment
+
+`server/test-workflow.js` and `server/test-oauth.js` are manual API workflow scripts, not an automated test suite. The project does not currently define frontend unit/UI tests or lint scripts. Root validation is available with `npm run build`.
+
+`vercel.json` configures a Vercel static build and server function. Configure the same required server variables in the deployment environment. Before exposing a deployment, add and verify server-side authentication and role authorization for protected API operations; frontend route gating is not an authorization boundary.
+
+The PWA service worker in `public/sw.js` caches only a small app shell and does not provide offline data synchronization.

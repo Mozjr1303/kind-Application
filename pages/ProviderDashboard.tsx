@@ -1,7 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, DollarSign, Star, MapPin, Clock, ChevronRight, ChevronLeft, CheckCircle, Briefcase, Camera, X, Upload, AlertCircle, MessageCircle, Send, Smile, Phone, MoreVertical, ArrowRight, User, FileText, Shield, Navigation } from 'lucide-react';
 import { StatCard } from '../components/StatCard';
 import { Badge } from '../components/Badge';
+import { apiFetch } from '../api';
+import { ProviderLocationPicker } from '../components/ProviderLocationPicker';
+import { isInsideLilongwe, reverseGeocodeLilongwe } from '../constants/lilongwe';
 
 const serviceCategories = [
    'Plumbing',
@@ -62,6 +65,9 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({ providerNa
       hourlyRate: '',
       service: selectedService,
       location: selectedLocation,
+      area_name: selectedLocation || 'City Centre',
+      latitude: -13.9535,
+      longitude: 33.7885,
       motivation: '',
       qualifications: '',
       photo_url: '',
@@ -81,30 +87,90 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({ providerNa
    const [showCalendarModal, setShowCalendarModal] = useState(false);
    const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date());
    const [isLocating, setIsLocating] = useState(false);
+   const [isLiveBroadcasting, setIsLiveBroadcasting] = useState(false);
+   const [liveGpsError, setLiveGpsError] = useState<string | null>(null);
+   const providerWatchRef = useRef<number | null>(null);
 
-   const handleDetectLocation = () => {
+   const stopLiveBroadcast = () => {
+      if (providerWatchRef.current !== null && navigator.geolocation) {
+         navigator.geolocation.clearWatch(providerWatchRef.current);
+         providerWatchRef.current = null;
+      }
+      setIsLiveBroadcasting(false);
+   };
+
+   useEffect(() => {
+      return () => {
+         if (providerWatchRef.current !== null && navigator.geolocation) {
+            navigator.geolocation.clearWatch(providerWatchRef.current);
+         }
+      };
+   }, []);
+
+   const toggleLiveGpsBroadcast = () => {
       if (!navigator.geolocation) {
-         alert("Geolocation not supported");
+         setLiveGpsError("Geolocation not supported by your browser.");
+         return;
+      }
+      if (isLiveBroadcasting) {
+         stopLiveBroadcast();
          return;
       }
       setIsLocating(true);
-      navigator.geolocation.getCurrentPosition(
-         (position) => {
-            const { latitude, longitude } = position.coords;
-            // Basic Lilongwe bounds check
-            if (latitude < -13 && latitude > -15 && longitude > 33 && longitude < 35) {
-               setProfileForm(prev => ({ ...prev, location: 'City Centre' }));
-               alert("Detected Lilongwe! Setting area to 'City Centre'.");
-            } else {
-               alert("You seem to be outside Lilongwe. Please select your area manually.");
-            }
+      setLiveGpsError(null);
+
+      const watchId = navigator.geolocation.watchPosition(
+         async (position) => {
             setIsLocating(false);
+            const { latitude, longitude } = position.coords;
+            setIsLiveBroadcasting(true);
+
+            const useLat = isInsideLilongwe(latitude, longitude)
+               ? latitude
+               : isInsideLilongwe(profileForm.latitude, profileForm.longitude)
+               ? profileForm.latitude
+               : -13.9535;
+            const useLng = isInsideLilongwe(latitude, longitude)
+               ? longitude
+               : isInsideLilongwe(profileForm.latitude, profileForm.longitude)
+               ? profileForm.longitude
+               : 33.7885;
+
+            const resolvedArea = await reverseGeocodeLilongwe(useLat, useLng);
+            const roundedLat = Number(useLat.toFixed(5));
+            const roundedLng = Number(useLng.toFixed(5));
+
+            setSelectedLocation(resolvedArea);
+            setProfileForm(prev => ({
+               ...prev,
+               location: resolvedArea,
+               area_name: resolvedArea,
+               latitude: roundedLat,
+               longitude: roundedLng,
+            }));
+
+            const userId = localStorage.getItem('userId');
+            if (userId) {
+               apiFetch(`/api/users/${userId}`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                     location: resolvedArea,
+                     area_name: resolvedArea,
+                     latitude: roundedLat,
+                     longitude: roundedLng,
+                  })
+               }).catch(() => {});
+            }
          },
          () => {
             setIsLocating(false);
-            alert("Could not detect location. Please select manually.");
-         }
+            stopLiveBroadcast();
+            setLiveGpsError("Could not read GPS. Open 'Update Profile' to set your pin on the map.");
+         },
+         { enableHighAccuracy: true, timeout: 12000, maximumAge: 5000 }
       );
+      providerWatchRef.current = watchId;
    };
 
    const openConversation = async (req: any) => {
@@ -122,7 +188,7 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({ providerNa
       };
 
       try {
-         const res = await fetch(`/api/messages/${req.id}`);
+         const res = await apiFetch(`/api/messages/${req.id}`);
          if (res.ok) {
             const data = await res.json();
             const fetchedMessages = Array.isArray(data) ? data : [];
@@ -160,7 +226,7 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({ providerNa
       if (!userId) return;
 
       try {
-         const res = await fetch('/api/messages', {
+         const res = await apiFetch('/api/messages', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -207,7 +273,7 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({ providerNa
          const token = localStorage.getItem('token');
          if (token) {
             try {
-               const res = await fetch('/api/me', {
+               const res = await apiFetch('/api/me', {
                   headers: { Authorization: `Bearer ${token}` }
                });
                if (res.ok) {
@@ -236,7 +302,10 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({ providerNa
                            bio: data.user.motivation || '', // Map bio to motivation
                            hourlyRate: '',
                            service: data.user.service,
-                           location: data.user.location,
+                           location: data.user.area_name || data.user.location || '',
+                           area_name: data.user.area_name || data.user.location || 'City Centre',
+                           latitude: typeof data.user.latitude === 'number' ? data.user.latitude : -13.9535,
+                           longitude: typeof data.user.longitude === 'number' ? data.user.longitude : 33.7885,
                            motivation: data.user.motivation || '',
                            qualifications: data.user.qualifications || '',
                            photo_url: data.user.photo_url || '',
@@ -293,7 +362,7 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({ providerNa
 
       setLoadingRequests(true);
       try {
-         const res = await fetch(`/api/contact-requests/provider/${userId}`);
+         const res = await apiFetch(`/api/contact-requests/provider/${userId}`);
          if (res.ok) {
             const data = await res.json();
             const requests = Array.isArray(data) ? data : [];
@@ -335,6 +404,83 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({ providerNa
 
 
 
+   const [uploadedPhotoName, setUploadedPhotoName] = useState<string>('');
+   const [uploadedPdfName, setUploadedPdfName] = useState<string>('');
+
+   const handlePhotoFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      if (!file.type.startsWith('image/')) {
+         alert('Please select a valid image file (JPG, PNG, WEBP).');
+         return;
+      }
+
+      if (file.size > 8 * 1024 * 1024) {
+         alert('Image file is too large. Please select an image under 8 MB.');
+         return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+         const img = new Image();
+         img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const size = 400;
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+
+            // Center-crop square for a crisp profile avatar
+            const minDim = Math.min(img.width, img.height);
+            const sx = (img.width - minDim) / 2;
+            const sy = (img.height - minDim) / 2;
+            ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, size, size);
+
+            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            setUploadedPhotoName(file.name);
+            setProfileForm((prev) => ({
+               ...prev,
+               photo_url: compressedDataUrl,
+            }));
+         };
+         if (typeof event.target?.result === 'string') {
+            img.src = event.target.result;
+         }
+      };
+      reader.readAsDataURL(file);
+      e.target.value = '';
+   };
+
+   const handlePdfFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+         alert('Please select a PDF document.');
+         return;
+      }
+
+      if (file.size > 3.5 * 1024 * 1024) {
+         alert('PDF file must be under 3.5 MB.');
+         return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+         if (typeof event.target?.result === 'string') {
+            setUploadedPdfName(file.name);
+            setProfileForm((prev) => ({
+               ...prev,
+               certificates_url: event.target!.result as string,
+            }));
+         }
+      };
+      reader.readAsDataURL(file);
+      e.target.value = '';
+   };
+
    const handleServiceChange = (service: string) => {
       setSelectedService(service);
    };
@@ -349,13 +495,16 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({ providerNa
          try {
             const userId = localStorage.getItem('userId');
             if (userId) {
-               const res = await fetch(`/api/users/${userId}`, {
+               const res = await apiFetch(`/api/users/${userId}`, {
                   method: 'PUT',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
                      name: profileForm.name,
                      service: selectedService,
-                     location: selectedLocation,
+                     location: profileForm.area_name || selectedLocation,
+                     area_name: profileForm.area_name || selectedLocation,
+                     latitude: profileForm.latitude,
+                     longitude: profileForm.longitude,
                      motivation: profileForm.motivation,
                      qualifications: profileForm.qualifications,
                      photo_url: profileForm.photo_url,
@@ -389,13 +538,16 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({ providerNa
          if (!userId) throw new Error('User ID not found');
 
          // 1. Update User Basic Info via API
-         const res = await fetch(`/api/users/${userId}`, {
+         const res = await apiFetch(`/api/users/${userId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                name: profileForm.name,
                service: profileForm.service,
-               location: profileForm.location,
+               location: profileForm.area_name || profileForm.location,
+               area_name: profileForm.area_name || profileForm.location,
+               latitude: profileForm.latitude,
+               longitude: profileForm.longitude,
                motivation: profileForm.motivation,
                qualifications: profileForm.qualifications,
                photo_url: profileForm.photo_url,
@@ -469,51 +621,96 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({ providerNa
                         />
                      </div>
 
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                           <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Service Category</label>
-                           <div className="relative">
-                              <select
-                                 value={selectedService}
-                                 onChange={(e) => handleServiceChange(e.target.value)}
-                                 className="w-full px-4 py-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-purple-600 dark:text-purple-400 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500 appearance-none font-bold"
-                              >
-                                 <option value="">Select service...</option>
-                                 {serviceCategories.map((c) => <option key={c} value={c}>{c}</option>)}
-                              </select>
-                              <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 rotate-90 text-slate-400" size={18} />
-                           </div>
-                        </div>
-                        <div>
-                           <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Working Location</label>
-                           <div className="relative">
-                              <select
-                                 value={selectedLocation}
-                                 onChange={(e) => handleLocationChange(e.target.value)}
-                                 className="w-full px-4 py-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-purple-600 dark:text-purple-400 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500 appearance-none font-bold"
-                              >
-                                 <option value="">Select location...</option>
-                                 <option value="Blantyre">Blantyre</option>
-                                 <option value="Lilongwe">Lilongwe</option>
-                                 <option value="Mzuzu">Mzuzu</option>
-                              </select>
-                              <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 rotate-90 text-slate-400" size={18} />
-                           </div>
+                     <div>
+                        <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Service Category</label>
+                        <div className="relative">
+                           <select
+                              value={selectedService}
+                              onChange={(e) => handleServiceChange(e.target.value)}
+                              className="w-full px-4 py-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-purple-600 dark:text-purple-400 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500 appearance-none font-bold"
+                           >
+                              <option value="">Select service...</option>
+                              {serviceCategories.map((c) => <option key={c} value={c}>{c}</option>)}
+                           </select>
+                           <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 rotate-90 text-slate-400" size={18} />
                         </div>
                      </div>
+
+                     <ProviderLocationPicker
+                        initialAreaName={profileForm.area_name || selectedLocation || 'City Centre'}
+                        initialLat={profileForm.latitude}
+                        initialLng={profileForm.longitude}
+                        onLocationChange={(loc) => {
+                           setSelectedLocation(loc.area_name);
+                           setProfileForm(prev => ({
+                              ...prev,
+                              location: loc.area_name,
+                              area_name: loc.area_name,
+                              latitude: loc.latitude,
+                              longitude: loc.longitude
+                           }));
+                        }}
+                     />
                   </div>
                )}
 
                {onboardingStep === 2 && (
                   <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
-                     <div className="flex items-center gap-6 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl">
-                        <input type="file" id="onboarding-photo" accept="image/*" className="hidden" onChange={() => setProfileForm({ ...profileForm, photo_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=1974&auto=format&fit=crop' })} />
-                        <label htmlFor="onboarding-photo" className="w-20 h-20 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center cursor-pointer hover:bg-slate-300 transition-colors overflow-hidden shrink-0">
-                           {profileForm.photo_url ? <img src={profileForm.photo_url} className="w-full h-full object-cover" /> : <Camera className="text-slate-500" size={30} />}
-                        </label>
-                        <div>
-                           <p className="font-bold text-slate-900 dark:text-white">Profile Photo</p>
-                           <p className="text-xs text-slate-500">Clients prefer seeing who they hire.</p>
+                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                        <div className="flex items-center gap-5">
+                           <input
+                              type="file"
+                              id="onboarding-photo"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={handlePhotoFileSelect}
+                           />
+                           <label
+                              htmlFor="onboarding-photo"
+                              className="w-20 h-20 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center cursor-pointer hover:ring-4 hover:ring-indigo-500/20 transition-all overflow-hidden shrink-0 relative group border-2 border-white dark:border-slate-700 shadow-md"
+                           >
+                              {profileForm.photo_url ? (
+                                 <img
+                                    src={profileForm.photo_url}
+                                    alt="Profile preview"
+                                    className="w-full h-full object-cover"
+                                 />
+                              ) : (
+                                 <Camera className="text-slate-500" size={30} />
+                              )}
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                 <Upload className="text-white" size={18} />
+                              </div>
+                           </label>
+                           <div>
+                              <p className="font-bold text-slate-900 dark:text-white">Profile Photo</p>
+                              <p className="text-xs text-slate-500">
+                                 {uploadedPhotoName
+                                    ? `Selected: ${uploadedPhotoName}`
+                                    : 'Clients prefer seeing who they hire.'}
+                              </p>
+                           </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                           <label
+                              htmlFor="onboarding-photo"
+                              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold cursor-pointer transition-colors shadow-sm"
+                           >
+                              {profileForm.photo_url ? 'Change Photo' : 'Upload Photo'}
+                           </label>
+                           {profileForm.photo_url && (
+                              <button
+                                 type="button"
+                                 onClick={() => {
+                                    setUploadedPhotoName('');
+                                    setProfileForm((prev) => ({ ...prev, photo_url: '' }));
+                                 }}
+                                 className="px-3 py-2 rounded-xl bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 text-xs font-bold hover:bg-rose-100 transition-colors"
+                              >
+                                 Remove
+                              </button>
+                           )}
                         </div>
                      </div>
 
@@ -556,16 +753,30 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({ providerNa
                            <div className="p-4 bg-white dark:bg-slate-800 rounded-xl flex items-center justify-between shadow-sm">
                               <div className="flex items-center gap-3">
                                  <FileText className="text-emerald-500" />
-                                 <span className="text-sm font-bold text-slate-700 dark:text-white">document_ready.pdf</span>
+                                 <span className="text-sm font-bold text-slate-700 dark:text-white">
+                                    {uploadedPdfName || 'verification_document.pdf'}
+                                 </span>
                               </div>
-                              <CheckCircle className="text-emerald-500" size={20} />
+                              <div className="flex items-center gap-3">
+                                 <button
+                                    type="button"
+                                    onClick={() => {
+                                       setUploadedPdfName('');
+                                       setProfileForm(prev => ({ ...prev, certificates_url: '' }));
+                                    }}
+                                    className="text-xs font-bold text-rose-500 hover:underline"
+                                 >
+                                    Remove
+                                 </button>
+                                 <CheckCircle className="text-emerald-500" size={20} />
+                              </div>
                            </div>
                         ) : (
                            <label className="block border-2 border-dashed border-indigo-200 dark:border-indigo-900/50 rounded-xl p-8 text-center cursor-pointer hover:bg-white dark:hover:bg-slate-800 transition-all">
-                              <input type="file" accept=".pdf" className="hidden" onChange={() => setProfileForm({ ...profileForm, certificates_url: 'mock_pdf' })} />
+                              <input type="file" accept=".pdf,application/pdf" className="hidden" onChange={handlePdfFileSelect} />
                               <Upload className="mx-auto text-indigo-400 mb-2" size={30} />
                               <p className="text-indigo-600 font-bold mb-1">Click to Upload PDF</p>
-                              <p className="text-xs text-slate-400">Maximum size: 5MB</p>
+                              <p className="text-xs text-slate-400">Maximum size: 3.5MB</p>
                            </label>
                         )}
                      </div>
@@ -657,29 +868,73 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({ providerNa
 
             <div className="relative z-10 p-8 md:p-12">
                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                  <div>
-                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-sm font-medium text-indigo-300 mb-4">
-                        <span className="relative flex h-2 w-2">
-                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                           <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
-                        </span>
-                        Active Provider
+                  <div className="flex items-center gap-5">
+                     <button
+                        type="button"
+                        onClick={() => setShowProfileModal(true)}
+                        title="Click to update profile photo"
+                        className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-white/10 backdrop-blur-md border-2 border-indigo-400/50 flex items-center justify-center overflow-hidden shrink-0 shadow-xl relative group"
+                     >
+                        {profileForm.photo_url ? (
+                           <img src={profileForm.photo_url} alt={displayName} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                        ) : (
+                           <Camera className="text-indigo-200 group-hover:text-white transition-colors" size={32} />
+                        )}
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                           <Camera size={18} className="text-white" />
+                        </div>
+                     </button>
+                     <div>
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-sm font-medium text-indigo-300 mb-3">
+                           <span className="relative flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                           </span>
+                           Active Provider
+                        </div>
+                        <h1 className="text-3xl md:text-5xl font-bold mb-2">
+                           Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-300">{displayName}!</span>
+                        </h1>
+                        <p className="text-indigo-100 text-lg">Here's what's happening with your business today.</p>
                      </div>
-                     <h1 className="text-3xl md:text-5xl font-bold mb-2">
-                        Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-300">{displayName}!</span>
-                     </h1>
-                     <p className="text-indigo-100 text-lg">Here's what's happening with your business today.</p>
                   </div>
 
                   <div className="flex flex-col sm:flex-row gap-6 w-full md:w-auto items-start sm:items-center">
-                     {/* Service Badge */}
-                     <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 min-w-[160px]">
-                        <p className="text-indigo-200 text-xs font-bold uppercase tracking-wider mb-1">Service</p>
+                     {/* Service & Live Location Badge */}
+                     <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 min-w-[200px]">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                           <p className="text-indigo-200 text-xs font-bold uppercase tracking-wider">Service & Area</p>
+                           {isLiveBroadcasting && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[9px] font-bold">
+                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                                 LIVE GPS
+                              </span>
+                           )}
+                        </div>
                         <div className="flex items-center gap-2 text-white font-bold text-lg">
                            <Briefcase size={20} className="text-indigo-400" />
                            {selectedService || 'General'}
                         </div>
-                        <p className="text-white/60 text-xs mt-1">{selectedLocation}</p>
+                        <p className="text-white/80 text-xs mt-1 flex items-center gap-1">
+                           <MapPin size={12} className="text-indigo-300" />
+                           {selectedLocation || 'City Centre'}
+                        </p>
+                        <button
+                           type="button"
+                           onClick={toggleLiveGpsBroadcast}
+                           disabled={isLocating}
+                           className={`mt-2.5 w-full py-1.5 px-3 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors ${
+                              isLiveBroadcasting
+                                 ? 'bg-emerald-500 text-white hover:bg-emerald-600'
+                                 : 'bg-indigo-600/80 text-white hover:bg-indigo-500'
+                           }`}
+                        >
+                           <Navigation size={12} className={isLocating ? 'animate-spin' : ''} />
+                           <span>{isLocating ? 'Connecting GPS...' : isLiveBroadcasting ? 'Broadcasting Live (Stop)' : 'Go Live on Map (GPS)'}</span>
+                        </button>
+                        {liveGpsError && (
+                           <p className="text-amber-300 text-[10px] mt-1.5 leading-snug">{liveGpsError}</p>
+                        )}
                      </div>
 
                      {/* Earnings */}
@@ -942,37 +1197,58 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({ providerNa
 
                   <form onSubmit={handleProfileUpdate} className="space-y-6">
                      {/* Profile Photo */}
-                     <div className="flex items-center gap-6">
-                        <div className="relative group">
-                           <input
-                              type="file"
-                              id="photo-upload"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(e) => {
-                                 // For demo: pretend we uploaded and got a URL
-                                 // In real app, this would be a FileReader or API call
-                                 setProfileForm({ ...profileForm, photo_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=1974&auto=format&fit=crop' });
-                              }}
-                           />
-                           <label
-                              htmlFor="photo-upload"
-                              className="w-24 h-24 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center border-2 border-dashed border-slate-300 dark:border-slate-600 overflow-hidden relative group cursor-pointer hover:border-indigo-400 transition-all shadow-inner"
-                           >
-                              {profileForm.photo_url ? (
-                                 <img src={profileForm.photo_url} alt="Profile" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                              ) : (
-                                 <Camera className="text-slate-400 dark:text-slate-500 group-hover:text-indigo-500" size={32} />
-                              )}
-                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                 <Upload className="text-white" size={20} />
+                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 p-5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                        <div className="flex items-center gap-5">
+                           <div className="relative group">
+                              <input
+                                 type="file"
+                                 id="photo-upload"
+                                 accept="image/*"
+                                 className="hidden"
+                                 onChange={handlePhotoFileSelect}
+                              />
+                              <label
+                                 htmlFor="photo-upload"
+                                 className="w-24 h-24 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center border-2 border-dashed border-slate-300 dark:border-slate-600 overflow-hidden relative group cursor-pointer hover:border-indigo-400 transition-all shadow-inner"
+                              >
+                                 {profileForm.photo_url ? (
+                                    <img src={profileForm.photo_url} alt="Profile" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                 ) : (
+                                    <Camera className="text-slate-400 dark:text-slate-500 group-hover:text-indigo-500" size={32} />
+                                 )}
+                                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Upload className="text-white" size={20} />
+                                 </div>
+                              </label>
+                           </div>
+                           <div>
+                              <h3 className="font-bold text-slate-900 dark:text-white">Profile Photo</h3>
+                              <p className="text-sm text-slate-500 dark:text-slate-400 mb-2 font-medium">
+                                 {uploadedPhotoName
+                                    ? `Selected: ${uploadedPhotoName}`
+                                    : 'Click the circle or button to upload your photo.'}
+                              </p>
+                              <div className="flex items-center gap-3">
+                                 <label
+                                    htmlFor="photo-upload"
+                                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold cursor-pointer transition-colors shadow-sm"
+                                 >
+                                    {profileForm.photo_url ? 'Change Photo' : 'Upload Photo'}
+                                 </label>
+                                 {profileForm.photo_url && (
+                                    <button
+                                       type="button"
+                                       onClick={() => {
+                                          setUploadedPhotoName('');
+                                          setProfileForm({ ...profileForm, photo_url: '' });
+                                       }}
+                                       className="px-3 py-2 rounded-xl bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 text-xs font-bold hover:bg-rose-100 transition-colors"
+                                    >
+                                       Remove
+                                    </button>
+                                 )}
                               </div>
-                           </label>
-                        </div>
-                        <div>
-                           <h3 className="font-bold text-slate-900 dark:text-white">Profile Photo</h3>
-                           <p className="text-sm text-slate-500 dark:text-slate-400 mb-2 font-medium">Click the circle to upload a professional photo.</p>
-                           <label htmlFor="photo-upload" className="text-indigo-600 text-sm font-bold hover:underline cursor-pointer">Change Photo</label>
+                           </div>
                         </div>
                      </div>
 
@@ -1010,43 +1286,33 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({ providerNa
                         ></textarea>
                      </div>
 
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                           <label className="block text-sm font-bold text-slate-700 mb-2">Service Category</label>
-                           <select
-                              value={profileForm.service}
-                              onChange={e => setProfileForm({ ...profileForm, service: e.target.value })}
-                              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                           >
-                              {serviceCategories.map(cat => (
-                                 <option key={cat} value={cat}>{cat}</option>
-                              ))}
-                           </select>
-                        </div>
-                        <div>
-                           <div className="flex gap-2">
-                              <select
-                                 value={profileForm.location}
-                                 onChange={e => setProfileForm({ ...profileForm, location: e.target.value })}
-                                 className="flex-1 px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                              >
-                                 <option value="">Select Area</option>
-                                 {lilongweAreas.map(area => (
-                                    <option key={area} value={area}>{area}</option>
-                                 ))}
-                              </select>
-                              <button
-                                 type="button"
-                                 onClick={handleDetectLocation}
-                                 disabled={isLocating}
-                                 className={`p-3 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors ${isLocating ? 'text-indigo-600 animate-pulse' : 'text-slate-400'}`}
-                                 title="Detect current location"
-                              >
-                                 <Navigation size={20} className={isLocating ? 'animate-spin' : ''} />
-                              </button>
-                           </div>
-                        </div>
+                     <div>
+                        <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Service Category</label>
+                        <select
+                           value={profileForm.service}
+                           onChange={e => setProfileForm({ ...profileForm, service: e.target.value })}
+                           className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+                        >
+                           {serviceCategories.map(cat => (
+                              <option key={cat} value={cat}>{cat}</option>
+                           ))}
+                        </select>
                      </div>
+
+                     <ProviderLocationPicker
+                        initialAreaName={profileForm.area_name || profileForm.location || 'City Centre'}
+                        initialLat={profileForm.latitude}
+                        initialLng={profileForm.longitude}
+                        onLocationChange={(loc) => {
+                           setProfileForm(prev => ({
+                              ...prev,
+                              location: loc.area_name,
+                              area_name: loc.area_name,
+                              latitude: loc.latitude,
+                              longitude: loc.longitude
+                           }));
+                        }}
+                     />
 
                      {/* Document Upload */}
                      <div>
@@ -1061,12 +1327,15 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({ providerNa
                                  </div>
                                  <div>
                                     <p className="text-sm font-bold text-slate-900 dark:text-white">Document Uploaded</p>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400">verification_documents.pdf</p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">{uploadedPdfName || 'verification_documents.pdf'}</p>
                                  </div>
                               </div>
                               <button
                                  type="button"
-                                 onClick={() => setProfileForm({ ...profileForm, certificates_url: '' })}
+                                 onClick={() => {
+                                    setUploadedPdfName('');
+                                    setProfileForm({ ...profileForm, certificates_url: '' });
+                                 }}
                                  className="text-xs font-bold text-rose-500 hover:underline"
                               >
                                  Remove
@@ -1076,15 +1345,15 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({ providerNa
                            <div className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl p-8 text-center hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer group">
                               <input
                                  type="file"
-                                 accept=".pdf"
+                                 accept=".pdf,application/pdf"
                                  className="hidden"
                                  id="pdf-upload"
-                                 onChange={() => setProfileForm({ ...profileForm, certificates_url: 'mock_pdf_url' })}
+                                 onChange={handlePdfFileSelect}
                               />
                               <label htmlFor="pdf-upload" className="cursor-pointer">
                                  <FileText className="mx-auto text-slate-400 mb-3 group-hover:text-indigo-500 transition-colors" size={40} />
                                  <p className="text-slate-700 dark:text-slate-200 font-bold mb-1">Click to upload PDF</p>
-                                 <p className="text-slate-400 text-xs">Maximum size: 5MB • PDF Only</p>
+                                 <p className="text-slate-400 text-xs">Maximum size: 3.5MB • PDF Only</p>
                               </label>
                            </div>
                         )}
@@ -1235,4 +1504,3 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({ providerNa
       </div>
    );
 };
-

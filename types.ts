@@ -4,6 +4,24 @@ export enum UserRole {
   CLIENT = 'CLIENT',
 }
 
+export interface AuthUser {
+  id: string | number;
+  name: string;
+  email: string;
+  role: UserRole;
+  status?: string;
+}
+
+export const isAuthUser = (value: unknown): value is AuthUser => {
+  if (typeof value !== 'object' || value === null) return false;
+  const user = value as Record<string, unknown>;
+  return (typeof user.id === 'string' || typeof user.id === 'number') &&
+    typeof user.name === 'string' &&
+    typeof user.email === 'string' &&
+    Object.values(UserRole).includes(user.role as UserRole) &&
+    (user.status === undefined || typeof user.status === 'string');
+};
+
 export interface User {
   id: string;
   name: string;

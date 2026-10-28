@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { HashRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { UserRole } from './types';
+import React, { useCallback, useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { isAuthUser, UserRole } from './types';
 import { Login } from './pages/Login';
 import { DashboardLayout } from './components/DashboardLayout';
 import { AdminDashboard } from './pages/AdminDashboard';
@@ -15,22 +15,25 @@ import Home from './pages/Home';
 import Register from './pages/Register';
 import OAuthCallback from './pages/OAuthCallback';
 import { ProviderUpdates } from './pages/ProviderUpdates';
+import { AuthUser } from './types';
 
-// Simple context-like wrapper for navigating after login
 const AppRoutes = () => {
-  const [role, setRole] = useState<UserRole | null>(() => {
-    return (localStorage.getItem('userRole') as UserRole) || null;
-  });
-  const [userName, setUserName] = useState<string>(() => {
-    return localStorage.getItem('userName') || '';
+  const [authUser, setAuthUser] = useState<AuthUser | null>(() => {
+    const token = localStorage.getItem('token');
+    const storedUser = localStorage.getItem('user');
+    if (!token || !storedUser) return null;
+    try {
+      const user: unknown = JSON.parse(storedUser);
+      return isAuthUser(user) ? user : null;
+    } catch {
+      return null;
+    }
   });
   const navigate = useNavigate();
 
-  const handleLogin = (selectedRole: UserRole) => {
-    setRole(selectedRole);
-    localStorage.setItem('userRole', selectedRole);
-    setUserName(localStorage.getItem('userName') || '');
-    switch (selectedRole) {
+  const handleLogin = useCallback((user: AuthUser) => {
+    setAuthUser(user);
+    switch (user.role) {
       case UserRole.ADMIN:
         navigate('/admin');
         break;
@@ -41,11 +44,14 @@ const AppRoutes = () => {
         navigate('/client');
         break;
     }
-  };
+  }, [navigate]);
 
   const handleLogout = () => {
-    setRole(null);
-    setUserName('');
+    setAuthUser(null);
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('userStatus');
     localStorage.removeItem('userRole');
     localStorage.removeItem('userName');
     navigate('/login');
@@ -55,13 +61,13 @@ const AppRoutes = () => {
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<Login onLogin={handleLogin} />} />
-      <Route path="/register" element={<Register />} />
+      <Route path="/register" element={<Register onLogin={handleLogin} />} />
       <Route path="/oauth-callback" element={<OAuthCallback onLogin={handleLogin} />} />
 
       <Route
         path="/admin/*"
         element={
-          role === UserRole.ADMIN ? (
+          authUser?.role === UserRole.ADMIN ? (
             <DashboardLayout role={UserRole.ADMIN} onLogout={handleLogout}>
               <Routes>
                 <Route path="/" element={<AdminDashboard />} />
@@ -79,10 +85,10 @@ const AppRoutes = () => {
       <Route
         path="/provider/*"
         element={
-          role === UserRole.PROVIDER ? (
+          authUser?.role === UserRole.PROVIDER ? (
             <DashboardLayout role={UserRole.PROVIDER} onLogout={handleLogout}>
               <Routes>
-                <Route path="/" element={<ProviderDashboard providerName={userName} />} />
+                <Route path="/" element={<ProviderDashboard providerName={authUser.name} />} />
                 <Route path="profile" element={<ProviderSettings />} />
                 <Route path="updates" element={<ProviderUpdates />} />
               </Routes>
@@ -96,7 +102,7 @@ const AppRoutes = () => {
       <Route
         path="/client/*"
         element={
-          role === UserRole.CLIENT ? (
+          authUser?.role === UserRole.CLIENT ? (
             <DashboardLayout role={UserRole.CLIENT} onLogout={handleLogout}>
               <Routes>
                 <Route path="/" element={<ClientDashboard />} />

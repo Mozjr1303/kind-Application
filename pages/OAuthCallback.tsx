@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { UserRole } from '../types';
+import { AuthUser, isAuthUser } from '../types';
+import { apiFetch } from '../api';
 
 interface OAuthCallbackProps {
-  onLogin: (role: UserRole) => void;
+  onLogin: (user: AuthUser) => void;
 }
 
 const OAuthCallback: React.FC<OAuthCallbackProps> = ({ onLogin }) => {
@@ -41,23 +42,15 @@ const OAuthCallback: React.FC<OAuthCallbackProps> = ({ onLogin }) => {
         const regToken = params.get('registerToken');
 
         if (token) {
-          // LOGIN SUCCESS
-          const roleStr = params.get('role');
-          const name = params.get('name');
-          const id = params.get('id');
-
-          if (roleStr && name && id) {
-            setStatus('Logging in...');
-            localStorage.setItem('token', token);
-            localStorage.setItem('userName', name);
-            localStorage.setItem('userId', id);
-            const status = params.get('status');
-            if (status) localStorage.setItem('userStatus', status);
-            const role = roleStr.toUpperCase() as UserRole;
-            onLogin(role);
-          } else {
-            setError('Missing login parameters.');
-          }
+          const userParam = params.get('user');
+          const user = userParam ? JSON.parse(userParam) : {
+            id: params.get('id'),
+            name: params.get('name'),
+            email: params.get('email'),
+            role: params.get('role'),
+            status: params.get('status') || undefined
+          };
+          completeLogin({ token, user });
         } else if (regToken) {
           // NEW USER - NEEDS ROLE SELECTION
           setRegisterToken(regToken);
@@ -86,13 +79,25 @@ const OAuthCallback: React.FC<OAuthCallbackProps> = ({ onLogin }) => {
     processCallback();
   }, [location, onLogin]);
 
+  const completeLogin = (data: { token: unknown; user: unknown }) => {
+    if (typeof data.token !== 'string' || !isAuthUser(data.user)) {
+      throw new Error('Authentication response is missing valid user data.');
+    }
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('user', JSON.stringify(data.user));
+    localStorage.setItem('userName', data.user.name);
+    localStorage.setItem('userId', String(data.user.id));
+    if (data.user.status) localStorage.setItem('userStatus', data.user.status);
+    onLogin(data.user);
+  };
+
   const handleCompleteRegistration = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!registerToken) return;
 
     setSubmitting(true);
     try {
-      const res = await fetch('/api/auth/oauth-complete', {
+      const res = await apiFetch('/api/auth/oauth-complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ registerToken, role: selectedRole, phone_number: phoneNumber })
@@ -101,12 +106,7 @@ const OAuthCallback: React.FC<OAuthCallbackProps> = ({ onLogin }) => {
       const data = await res.json();
 
       if (res.ok) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('userName', data.name);
-        localStorage.setItem('userId', data.id);
-        if (data.status) localStorage.setItem('userStatus', data.status);
-        const role = (data.role || selectedRole).toUpperCase() as UserRole;
-        onLogin(role);
+        completeLogin({ token: data.token, user: data.user });
       } else {
         setError(data.message || 'Registration failed');
       }

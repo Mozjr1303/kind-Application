@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Users, Briefcase, Search, Filter, MoreHorizontal, Trash2, MapPin } from 'lucide-react';
 import { StatCard } from '../components/StatCard';
 import { Badge } from '../components/Badge';
+import { apiFetch } from '../api';
 
 type ApiUser = {
     id: number | string;
@@ -24,7 +25,7 @@ export const AdminUsers: React.FC = () => {
             if (!isBackground) setLoading(true);
             setError(null);
             try {
-                const res = await fetch('/api/users');
+                const res = await apiFetch('/api/users');
                 if (!res.ok) throw new Error('Failed to fetch users');
                 const data = await res.json();
                 setUsers(data || []);
@@ -51,7 +52,7 @@ export const AdminUsers: React.FC = () => {
         if (!window.confirm('Are you sure you want to remove this provider? This action cannot be undone.')) return;
 
         try {
-            const res = await fetch(`/api/users/${userId}`, {
+            const res = await apiFetch(`/api/users/${userId}`, {
                 method: 'DELETE',
             });
 

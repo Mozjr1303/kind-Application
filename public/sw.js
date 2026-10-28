@@ -1,23 +1,26 @@
-const CACHE_NAME = 'kind-v1';
-const ASSETS = [
-    '/',
-    '/index.html',
-    '/index.css',
-    '/manifest.json'
-];
+const CACHE_NAME = 'kind-v2';
 
-self.addEventListener('install', (event) => {
+self.addEventListener('install', () => {
+    self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
     event.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => {
-            return cache.addAll(ASSETS);
-        })
+        (async () => {
+            const keys = await caches.keys();
+            await Promise.all(keys.map((key) => caches.delete(key)));
+            await self.clients.claim();
+            const clients = await self.clients.matchAll({ type: 'window' });
+            for (const client of clients) {
+                client.navigate(client.url);
+            }
+        })()
     );
 });
 
 self.addEventListener('fetch', (event) => {
+    if (event.request.method !== 'GET') return;
     event.respondWith(
-        caches.match(event.request).then((response) => {
-            return response || fetch(event.request);
-        })
+        fetch(event.request).catch(() => caches.match(event.request))
     );
 });

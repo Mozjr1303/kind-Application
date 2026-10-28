@@ -1,10 +1,13 @@
 // Using built-in fetch (Node 18+)
 
-const BASE_URL = 'http://localhost:4000/api';
-const JWT_SECRET = 'dev_secret_change_me'; // Must match .env
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
+const BASE_URL = `${process.env.API_BASE_URL || 'http://localhost:4000'}/api`;
+const JWT_SECRET = process.env.JWT_SECRET;
+const TEST_PHONE_NUMBER = process.env.TEST_PHONE_NUMBER;
 const jwt = require('jsonwebtoken'); // Need this to generate a fake registerToken
 
 async function runOAuthTest() {
+    if (!JWT_SECRET) throw new Error('JWT_SECRET is required to run this test.');
     console.log('🚀 Testing OAuth Completion with Phone Number...\n');
 
     // 1. Generate a fake registerToken (simulating what the backend does after OAuth callback)
@@ -25,8 +28,8 @@ async function runOAuthTest() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             registerToken,
-            role: 'PROVIDER',
-            phone_number: '+265991600735' // Admin phone for testing
+            role: 'provider',
+            phone_number: TEST_PHONE_NUMBER
         })
     });
 
@@ -35,13 +38,13 @@ async function runOAuthTest() {
 
     if (res.status === 201) {
         console.log('   ✅ OAuth User Created Successfully');
-        console.log(`   ID: ${data.id}`);
-        console.log(`   Phone: ${data.phone_number}`);
-        console.log(`   Role: ${data.role}`);
+        console.log(`   ID: ${data.user.id}`);
+        console.log(`   Phone: ${data.user.phone_number || 'not provided'}`);
+        console.log(`   Role: ${data.user.role}`);
 
-        if (data.phone_number === '+265991600735') {
+        if (data.user.phone_number === TEST_PHONE_NUMBER) {
             console.log('   ✅ Phone Number Saved Correctly');
-        } else {
+        } else if (TEST_PHONE_NUMBER) {
             console.error('   ❌ Phone Number Mismatch');
         }
     } else {

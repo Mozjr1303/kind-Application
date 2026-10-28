@@ -17,7 +17,10 @@ CREATE TABLE IF NOT EXISTS users (
   certificates_url TEXT,
   rating REAL DEFAULT 0,
   jobs_done INTEGER DEFAULT 0,
-  phone_number TEXT
+  phone_number TEXT,
+  latitude DOUBLE PRECISION,
+  longitude DOUBLE PRECISION,
+  area_name TEXT
 );
 
 -- 2. Contact Requests Table
@@ -70,9 +73,4 @@ CREATE TABLE IF NOT EXISTS logs (
 -- Seed System User
 INSERT INTO users (name, email, password, role, status)
 VALUES ('KIND App', 'system@kind.app', '$2a$10$something-hashed-placeholder', 'SYSTEM', 'active')
-ON CONFLICT (email) DO NOTHING;
-
--- Seed Admin User (Optional, if not registered yet)
-INSERT INTO users (name, email, password, role, status)
-VALUES ('Admin', 'admin@kind.com', '$2a$10$hashed-admin-pass', 'ADMIN', 'active')
 ON CONFLICT (email) DO NOTHING;

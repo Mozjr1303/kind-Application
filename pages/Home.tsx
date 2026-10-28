@@ -11,7 +11,7 @@ const Home: React.FC = () => {
       <nav className="nav">
         <div className="nav__header">
           <div className="nav__logo">
-            <a href="/" className="logo">KIND</a>
+            <Link to="/" className="logo">KIND</Link>
           </div>
           <button id="menu-btn" className="nav__menu__btn" onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle menu">
             <span className="hamburger" />
@@ -33,8 +33,8 @@ const Home: React.FC = () => {
 
       <section className="hero">
         <div className="hero__content section__container" id="home">
-          <h1>Book Plumbers, Electricians &amp;<br />More in One Click — <span>KIND</span></h1>
-          <p>Your trusted local service partner. Search, connect, and book verified professionals near you.</p>
+          <h1>Book Plumbers, Electricians &amp;<br />More in Lilongwe — <span>KIND</span></h1>
+          <p>Connecting you with verified local service providers across Lilongwe. Search by neighborhood, view travel distances, and connect with trusted artisans.</p>
         </div>
       </section>
 
@@ -69,7 +69,7 @@ const Home: React.FC = () => {
 
       <section className="section__container services__container" id="services">
         <h2 className="section__header">Popular <span>Services</span></h2>
-        <p className="section__description">Quickly find trusted plumbers, electricians, carpenters, and more near you.</p>
+        <p className="section__description">Find trusted plumbers, electricians, carpenters, and more near you in Lilongwe.</p>
         <div className="services__grid">
           <div className="service__card"><div className="service__image"><img src="/assets/plumber.jpg" alt="Plumbing" /></div><div className="service__content"><h4>Plumbing</h4></div></div>
           <div className="service__card"><div className="service__image"><img src="/assets/electrician.jpg" alt="Electrician" /></div><div className="service__content"><h4>Electrician</h4></div></div>
@@ -81,17 +81,22 @@ const Home: React.FC = () => {
       </section>
 
       <section className="section__container providers__container" id="providers">
-        <h2 className="section__header">Search Results</h2>
-        <p className="section__description">Trusted experts ready to help you today.</p>
+        <h2 className="section__header">Lilongwe Service Coverage</h2>
+        <p className="section__description">Now serving Area 3, Area 18, Area 25, Area 47, City Centre, Old Town, Kawale, Kanengo, and all surrounding Lilongwe neighborhoods.</p>
+        <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
+          <Link to="/register" className="nav__cta" style={{ display: 'inline-block', padding: '0.75rem 1.5rem', borderRadius: '8px', textDecoration: 'none' }}>
+            Find Providers on the Map
+          </Link>
+        </div>
       </section>
 
       <section className="section__container trust__container">
-        <h2 className="section__header"><span>Safe &amp; Secure</span> Every Step of the Way</h2>
-        <p className="section__description">We verify all our providers to ensure high-quality service and your peace of mind.</p>
+        <h2 className="section__header"><span>Safe &amp; Reliable</span> Local Connections</h2>
+        <p className="section__description">We verify providers to ensure quality service and community trust.</p>
         <div className="trust__grid">
-          <div className="trust__card"><span className="trust__icon">🛡️</span><h4>Verified Profiles</h4><p>All providers go through identity and background checks.</p></div>
-          <div className="trust__card"><span className="trust__icon">💳</span><h4>Secure Payments</h4><p>Pay safely through our platform. No cash required.</p></div>
-          <div className="trust__card"><span className="trust__icon">📞</span><h4>24x7 Support</h4><p>We're here if anything goes wrong — anytime, anywhere.</p></div>
+          <div className="trust__card"><span className="trust__icon">🛡️</span><h4>Verified Profiles</h4><p>Providers go through identity and background verification.</p></div>
+          <div className="trust__card"><span className="trust__icon">📍</span><h4>Proximity Matching</h4><p>Calculate distances and hire artisans working in your neighborhood.</p></div>
+          <div className="trust__card"><span className="trust__icon">💬</span><h4>Direct Messaging</h4><p>Discuss job requirements, budgets, and scheduling directly.</p></div>
         </div>
       </section>
 

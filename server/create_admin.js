@@ -1,64 +1,47 @@
-const sqlite3 = require('sqlite3').verbose();
-const bcrypt = require('bcryptjs');
 const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
-async function main() {
-  const [,, name, email, password] = process.argv;
-  if (!name || !email || !password) {
-    console.error('Usage: node create_admin.js "Full Name" email@example.com "StrongPassword"');
-    process.exit(1);
-  }
+const { createClient } = require('@supabase/supabase-js');
+const bcrypt = require('bcryptjs');
 
-  const dbPath = path.join(__dirname, 'data.db');
-  const db = new sqlite3.Database(dbPath, (err) => {
-    if (err) {
-      console.error('Could not open database', err);
-      process.exit(1);
-    }
-  });
-
-  const hashed = await bcrypt.hash(password, 12);
-  const now = new Date().toISOString();
-
-  db.serialize(() => {
-    db.get('SELECT id FROM users WHERE email = ?', [email], (err, row) => {
-      if (err) {
-        console.error('DB error', err);
-        process.exit(1);
-      }
-
-      if (row) {
-        db.run(
-          'UPDATE users SET name = ?, password = ?, role = ?, created_at = ? WHERE id = ?',
-          [name, hashed, 'ADMIN', now, row.id],
-          function (updateErr) {
-            if (updateErr) {
-              console.error('Failed to update admin user', updateErr);
-              process.exit(1);
-            }
-            console.log(`Updated existing admin user (${email}) with id=${row.id}`);
-            process.exit(0);
-          }
-        );
-      } else {
-        db.run(
-          'INSERT INTO users (name, email, password, role, created_at) VALUES (?, ?, ?, ?, ?)',
-          [name, email, hashed, 'ADMIN', now],
-          function (insertErr) {
-            if (insertErr) {
-              console.error('Failed to create admin user', insertErr);
-              process.exit(1);
-            }
-            console.log(`Created admin user (${email}) with id=${this.lastID}`);
-            process.exit(0);
-          }
-        );
-      }
-    });
-  });
+const requiredEnv = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'ADMIN_NAME', 'ADMIN_EMAIL', 'ADMIN_PASSWORD'];
+const missingEnv = requiredEnv.filter(name => !process.env[name]);
+if (missingEnv.length > 0) {
+  console.error(`Missing required environment variables: ${missingEnv.join(', ')}`);
+  process.exit(1);
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+async function main() {
+  const { data: existingUser, error: lookupError } = await supabase
+    .from('users')
+    .select('id')
+    .eq('email', process.env.ADMIN_EMAIL)
+    .maybeSingle();
+
+  if (lookupError) throw lookupError;
+  if (existingUser) throw new Error('An account with ADMIN_EMAIL already exists.');
+
+  const password = await bcrypt.hash(process.env.ADMIN_PASSWORD, 12);
+  const { data, error } = await supabase
+    .from('users')
+    .insert([{
+      name: process.env.ADMIN_NAME,
+      email: process.env.ADMIN_EMAIL,
+      password,
+      role: 'ADMIN',
+      status: 'active',
+      created_at: new Date().toISOString()
+    }])
+    .select('id')
+    .single();
+
+  if (error) throw error;
+  console.log(`Admin user created with ID ${data.id}.`);
+}
+
+main().catch(error => {
+  console.error('Failed to create admin user:', error.message);
+  process.exitCode = 1;
 });

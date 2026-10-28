@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Star, MapPin, Briefcase, Clock, Award, ArrowLeft, Phone, Mail, Calendar, CheckCircle, X, Send } from 'lucide-react';
+import { apiFetch } from '../api';
 
 interface Provider {
     id: number;
@@ -42,13 +43,10 @@ export const ProviderProfile: React.FC = () => {
     useEffect(() => {
         const fetchProvider = async () => {
             try {
-                const res = await fetch(`/api/users`);
+                const res = await apiFetch(`/api/providers/${id}`);
                 if (res.ok) {
-                    const users = await res.json();
-                    const foundProvider = users.find((u: any) => u.id === parseInt(id || '0'));
-                    if (foundProvider) {
-                        setProvider(foundProvider);
-                    }
+                    const data = await res.json();
+                    setProvider(data);
                 }
             } catch (e) {
                 console.error('Failed to fetch provider', e);
@@ -110,7 +108,7 @@ export const ProviderProfile: React.FC = () => {
         setRequestStatus('idle');
 
         try {
-            const res = await fetch('/api/contact-requests', {
+            const res = await apiFetch('/api/contact-requests', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, MessageSquare, Check, Clock, AlertCircle } from 'lucide-react';
+import { apiFetch } from '../api';
 
 interface Notification {
     id: string;
@@ -25,7 +26,7 @@ export const ProviderUpdates = () => {
 
         try {
             // Fetch contact requests as notifications
-            const res = await fetch(`/api/contact-requests/provider/${userId}`);
+            const res = await apiFetch(`/api/contact-requests/provider/${userId}`);
             if (res.ok) {
                 const requests = await res.json();
 

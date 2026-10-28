@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AlertTriangle, CheckCircle, Info, XCircle, Filter, Search, Bell } from 'lucide-react';
+import { apiFetch } from '../api';
 
 type AlertSeverity = 'critical' | 'warning' | 'info' | 'success';
 
@@ -65,11 +66,11 @@ export const AdminAlerts: React.FC = () => {
         setLoading(true);
         try {
             // Fetch system alerts
-            const alertsRes = await fetch('/api/alerts');
+            const alertsRes = await apiFetch('/api/alerts');
             const systemAlerts = await alertsRes.json();
 
             // Fetch pending provider count
-            const providersRes = await fetch('/api/admin/pending-providers');
+            const providersRes = await apiFetch('/api/admin/pending-providers');
             const pendingProviders = await providersRes.json();
             setPendingCount(pendingProviders.length);
 
@@ -149,7 +150,7 @@ export const AdminAlerts: React.FC = () => {
     const markAsRead = async (id: number) => {
         if (id === 0) return; // Can't mark virtual alert as read here
         try {
-            await fetch(`/api/alerts/${id}/read`, { method: 'PUT' });
+            await apiFetch(`/api/alerts/${id}/read`, { method: 'PUT' });
             fetchAlertData();
         } catch (e) {
             console.error('Failed to mark as read', e);
@@ -158,7 +159,7 @@ export const AdminAlerts: React.FC = () => {
 
     const markAllRead = async () => {
         try {
-            await fetch(`/api/alerts/read-all`, { method: 'PUT' });
+            await apiFetch(`/api/alerts/read-all`, { method: 'PUT' });
             fetchAlertData();
         } catch (e) {
             console.error('Failed to mark all read', e);
@@ -168,7 +169,7 @@ export const AdminAlerts: React.FC = () => {
     const deleteAlert = async (id: number) => {
         if (id === 0) return; // Can't dismiss virtual alert like this
         try {
-            await fetch(`/api/alerts/${id}`, { method: 'DELETE' });
+            await apiFetch(`/api/alerts/${id}`, { method: 'DELETE' });
             fetchAlertData();
         } catch (e) {
             console.error('Failed to delete alert', e);
@@ -178,7 +179,7 @@ export const AdminAlerts: React.FC = () => {
     const clearAllAlerts = async () => {
         if (!window.confirm('Delete all alerts? This cannot be undone.')) return;
         try {
-            await fetch(`/api/alerts`, { method: 'DELETE' });
+            await apiFetch(`/api/alerts`, { method: 'DELETE' });
             fetchAlertData();
         } catch (e) {
             console.error('Failed to clear alerts', e);

@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import {
     Moon, Sun, Bell, Shield, Smartphone, Globe,
     ChevronRight, LogOut, Check, Laptop, Eye,
-    Lock, Mail, CreditCard, HelpCircle, Star, X
+    Lock, Mail, CreditCard, HelpCircle, Star, X, MapPin
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { ProviderLocationPicker } from '../components/ProviderLocationPicker';
+import { apiFetch } from '../api';
 
 export const ProviderSettings = () => {
     const navigate = useNavigate();
@@ -36,6 +38,70 @@ export const ProviderSettings = () => {
         new: '',
         confirm: ''
     });
+
+    // Location State
+    const [locationData, setLocationData] = useState<{
+        area_name: string;
+        latitude: number | null;
+        longitude: number | null;
+    }>({
+        area_name: localStorage.getItem('providerLocation') || 'City Centre',
+        latitude: null,
+        longitude: null
+    });
+    const [savingLocation, setSavingLocation] = useState(false);
+    const [locationSuccess, setLocationSuccess] = useState(false);
+
+    useEffect(() => {
+        const loadLocation = async () => {
+            try {
+                const res = await apiFetch('/api/me');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data?.user) {
+                        setLocationData({
+                            area_name: data.user.area_name || data.user.location || 'City Centre',
+                            latitude: typeof data.user.latitude === 'number' ? data.user.latitude : null,
+                            longitude: typeof data.user.longitude === 'number' ? data.user.longitude : null
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to load provider location:', err);
+            }
+        };
+        loadLocation();
+    }, []);
+
+    const handleSaveLocation = async () => {
+        const userId = localStorage.getItem('userId');
+        if (!userId) return;
+        setSavingLocation(true);
+        setLocationSuccess(false);
+        try {
+            const res = await apiFetch(`/api/users/${userId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    location: locationData.area_name,
+                    area_name: locationData.area_name,
+                    latitude: locationData.latitude,
+                    longitude: locationData.longitude
+                })
+            });
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.message || 'Failed to update location');
+            }
+            localStorage.setItem('providerLocation', locationData.area_name);
+            setLocationSuccess(true);
+            setTimeout(() => setLocationSuccess(false), 3000);
+        } catch (err: any) {
+            alert(err.message || 'Error updating location.');
+        } finally {
+            setSavingLocation(false);
+        }
+    };
 
     // toggle theme effect
     useEffect(() => {
@@ -93,12 +159,59 @@ export const ProviderSettings = () => {
                             <button className="w-full flex items-center gap-3 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl font-medium transition-colors">
                                 <Shield size={20} /> Privacy & Security
                             </button>
+                            <button className="w-full flex items-center gap-3 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl font-medium transition-colors">
+                                <MapPin size={20} /> Work Location
+                            </button>
                         </nav>
                     </div>
                 </div>
 
                 {/* Main Content Area */}
                 <div className="lg:col-span-2 space-y-8">
+
+                    {/* 0. Work Location Section */}
+                    <section className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 border border-slate-100 dark:border-slate-800 shadow-sm transition-colors duration-300">
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                                    <MapPin size={20} />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold text-slate-900 dark:text-white">Operating Location</h2>
+                                    <p className="text-sm text-slate-500 dark:text-slate-400">Set your Lilongwe operating area and service radius.</p>
+                                </div>
+                            </div>
+                            {locationSuccess && (
+                                <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-xs font-bold flex items-center gap-1">
+                                    <Check size={14} /> Saved
+                                </span>
+                            )}
+                        </div>
+
+                        <ProviderLocationPicker
+                            initialAreaName={locationData.area_name}
+                            initialLat={locationData.latitude}
+                            initialLng={locationData.longitude}
+                            onLocationChange={(loc) => {
+                                setLocationData({
+                                    area_name: loc.area_name,
+                                    latitude: loc.latitude,
+                                    longitude: loc.longitude
+                                });
+                            }}
+                        />
+
+                        <div className="mt-6 flex justify-end">
+                            <button
+                                type="button"
+                                onClick={handleSaveLocation}
+                                disabled={savingLocation}
+                                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none transition-all disabled:opacity-50"
+                            >
+                                {savingLocation ? 'Saving Location...' : 'Save Location'}
+                            </button>
+                        </div>
+                    </section>
 
                     {/* 1. Appearance Section */}
                     <section className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 border border-slate-100 dark:border-slate-800 shadow-sm transition-colors duration-300">

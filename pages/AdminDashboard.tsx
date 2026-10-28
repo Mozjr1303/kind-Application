@@ -3,6 +3,7 @@ import { Users, Briefcase, AlertTriangle, Activity, MoreHorizontal, Search, Filt
 import { StatCard } from '../components/StatCard';
 import { Badge } from '../components/Badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { apiFetch } from '../api';
 
 const mockChartData = [
   { name: 'Mon', users: 400, jobs: 240 },
@@ -44,7 +45,7 @@ export const AdminDashboard: React.FC = () => {
       if (!isBackground) setLoadingUsers(true);
       setUsersError(null);
       try {
-        const res = await fetch('/api/users');
+        const res = await apiFetch('/api/users');
         if (!res.ok) throw new Error('Failed to fetch users');
         const data = await res.json();
         setUsers(data || []);
@@ -59,7 +60,7 @@ export const AdminDashboard: React.FC = () => {
     const fetchPendingProviders = async (isBackground = false) => {
       if (!isBackground) setLoadingPending(true);
       try {
-        const res = await fetch('/api/admin/pending-providers');
+        const res = await apiFetch('/api/admin/pending-providers');
         if (res.ok) {
           const data = await res.json();
           // avoid unnecessary re-renders if data is same (deep check omitted for simplicity, relying on React)
@@ -75,7 +76,7 @@ export const AdminDashboard: React.FC = () => {
     const fetchContactRequests = async (isBackground = false) => {
       if (!isBackground) setLoadingRequests(true);
       try {
-        const res = await fetch('/api/contact-requests');
+        const res = await apiFetch('/api/contact-requests');
         if (res.ok) {
           const data = await res.json();
           setContactRequests(data || []);
@@ -104,7 +105,7 @@ export const AdminDashboard: React.FC = () => {
 
   const handleProviderStatus = async (id: number | string, status: 'active' | 'rejected') => {
     try {
-      const res = await fetch(`/api/admin/providers/${id}/status`, {
+      const res = await apiFetch(`/api/admin/providers/${id}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status })
@@ -112,13 +113,13 @@ export const AdminDashboard: React.FC = () => {
 
       if (res.ok) {
         // Refresh pending list
-        const refreshRes = await fetch('/api/admin/pending-providers');
+        const refreshRes = await apiFetch('/api/admin/pending-providers');
         if (refreshRes.ok) {
           const data = await refreshRes.json();
           setPendingProviders(data || []);
         }
         // Refresh all users list
-        const usersRes = await fetch('/api/users');
+        const usersRes = await apiFetch('/api/users');
         if (usersRes.ok) {
           const data = await usersRes.json();
           setUsers(data || []);
@@ -132,7 +133,7 @@ export const AdminDashboard: React.FC = () => {
   const handleDeleteUser = async (userId: number | string) => {
     if (!window.confirm('Are you sure you want to permanently delete this user account? This cannot be undone.')) return;
     try {
-      const res = await fetch(`/api/users/${userId}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/users/${userId}`, { method: 'DELETE' });
       if (res.ok) {
         setPendingProviders(prev => prev.filter(p => p.id !== userId));
         setUsers(prev => prev.filter(u => u.id !== userId));
@@ -142,16 +143,16 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleContactRequestStatus = async (id: number | string, status: 'approved' | 'rejected') => {
+  const handleContactRequestStatus = async (id: number | string, status: 'accepted' | 'declined') => {
     try {
-      const res = await fetch(`/api/contact-requests/${id}`, {
+      const res = await apiFetch(`/api/contact-requests/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status })
       });
 
       if (res.ok) {
-        const refreshRes = await fetch('/api/contact-requests');
+        const refreshRes = await apiFetch('/api/contact-requests');
         if (refreshRes.ok) {
           const data = await refreshRes.json();
           setContactRequests(data || []);
@@ -159,18 +160,6 @@ export const AdminDashboard: React.FC = () => {
       }
     } catch (e) {
       console.error(`Failed to ${status} contact request`, e);
-    }
-  };
-
-  const handleDeleteContactRequest = async (id: number | string) => {
-    if (!window.confirm('Delete this request? This action cannot be undone.')) return;
-    try {
-      const res = await fetch(`/api/contact-requests/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        setContactRequests(prev => prev.filter(r => r.id !== id));
-      }
-    } catch (e) {
-      console.error('Failed to delete contact request', e);
     }
   };
 
@@ -191,10 +180,9 @@ export const AdminDashboard: React.FC = () => {
                 const fetchPendingProviders = async () => {
                   setLoadingPending(true);
                   try {
-                    const res = await fetch('/api/admin/pending-providers');
+                    const res = await apiFetch('/api/admin/pending-providers');
                     if (res.ok) {
                       const data = await res.json();
-                      console.log('Refreshed pending providers:', data);
                       setPendingProviders(data || []);
                     }
                   } catch (e) {
@@ -426,13 +414,13 @@ export const AdminDashboard: React.FC = () => {
                           Pending
                         </span>
                       )}
-                      {request.status === 'approved' && (
+                      {request.status === 'accepted' && (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-medium">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                           Approved
                         </span>
                       )}
-                      {request.status === 'rejected' && (
+                      {request.status === 'declined' && (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-50 text-red-700 text-xs font-medium">
                           <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
                           Rejected
@@ -447,13 +435,13 @@ export const AdminDashboard: React.FC = () => {
                         {request.status === 'pending' ? (
                           <>
                             <button
-                              onClick={() => handleContactRequestStatus(request.id, 'approved')}
+                              onClick={() => handleContactRequestStatus(request.id, 'accepted')}
                               className="px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-medium hover:bg-indigo-100 transition-colors"
                             >
                               Approve
                             </button>
                             <button
-                              onClick={() => handleContactRequestStatus(request.id, 'rejected')}
+                              onClick={() => handleContactRequestStatus(request.id, 'declined')}
                               className="px-3 py-1.5 rounded-lg bg-red-50 text-red-700 text-xs font-medium hover:bg-red-100 transition-colors"
                             >
                               Reject
@@ -462,13 +450,6 @@ export const AdminDashboard: React.FC = () => {
                         ) : (
                           <span className="text-xs text-slate-400 italic">No action needed</span>
                         )}
-                        <button
-                          onClick={() => handleDeleteContactRequest(request.id)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors ml-2"
-                          title="Delete Request"
-                        >
-                          <Trash2 size={16} />
-                        </button>
                       </div>
                     </td>
                   </tr>

@@ -2,6 +2,7 @@ import React, { ReactNode } from 'react';
 import { UserRole } from '../types';
 import { LogOut, Menu, Bell, Search, Settings, User as UserIcon, LayoutGrid, Briefcase, MessageSquare, ShieldAlert } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
+import { apiFetch } from '../api';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -100,7 +101,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, role
 
       if (role === UserRole.PROVIDER && userId) {
         try {
-          const res = await fetch(`http://localhost:4000/api/contact-requests/provider/${userId}`);
+          const res = await apiFetch(`/api/contact-requests/provider/${userId}`);
           if (res.ok) {
             const data = await res.json();
             const requests = Array.isArray(data) ? data : [];
@@ -115,7 +116,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, role
         }
       } else if (role === UserRole.ADMIN) {
         try {
-          const res = await fetch('http://localhost:4000/api/admin/pending-providers');
+          const res = await apiFetch('/api/admin/pending-providers');
           if (res.ok) {
             const data = await res.json();
             const currentCount = Array.isArray(data) ? data.length : 0;

@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { AuthUser, isAuthUser } from '../types';
+import { apiFetch } from '../api';
 
-const Register: React.FC = () => {
+interface RegisterProps {
+  onLogin: (user: AuthUser) => void;
+}
+
+const Register: React.FC<RegisterProps> = ({ onLogin }) => {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -9,24 +15,35 @@ const Register: React.FC = () => {
   const [role, setRole] = useState('client');
   const [terms, setTerms] = useState(false);
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName || !email || !password || !role) return alert('Please fill in all fields.');
+    if (password.length < 8) return alert('Password must be at least 8 characters long.');
     if (!terms) return alert('You must agree to the terms and privacy policy.');
 
     setLoading(true);
     try {
-      const res = await fetch('/api/register', {
+      const res = await apiFetch('/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: fullName, email, password, role: role.toUpperCase(), phone_number: phoneNumber }),
+        body: JSON.stringify({ name: fullName, email, password, role, phone_number: phoneNumber }),
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.message || 'Registration failed.');
-      alert('Account created successfully!');
-      navigate('/login');
+      const data = await res.json();
+      if (!res.ok) {
+        const errorDetail = Array.isArray(data?.errors)
+          ? data.errors.map((e: any) => `${e.path ? e.path.join('.') + ': ' : ''}${e.message}`).join('\n')
+          : null;
+        throw new Error(errorDetail || data?.message || 'Registration failed.');
+      }
+      if (typeof data.token !== 'string' || !isAuthUser(data.user)) throw new Error('Registration response is missing valid authentication data.');
+
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      localStorage.setItem('userName', data.user.name);
+      localStorage.setItem('userId', String(data.user.id));
+      if (data.user.status) localStorage.setItem('userStatus', data.user.status);
+      onLogin(data.user);
     } catch (err: any) {
       alert(err.message || 'Server error. Please try again later.');
     } finally {
@@ -79,8 +96,8 @@ const Register: React.FC = () => {
           <label htmlFor="phoneNumber">Phone Number (e.g., +26599...)</label>
           <input id="phoneNumber" type="tel" value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} placeholder="+265..." autoComplete="tel" />
 
-          <label htmlFor="password">Create Password</label>
-          <input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} required autoComplete="new-password" />
+          <label htmlFor="password">Create Password (at least 8 characters)</label>
+          <input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={8} placeholder="At least 8 characters" autoComplete="new-password" />
 
           <label htmlFor="role">Select Role</label>
           <select id="role" required value={role} onChange={e => setRole(e.target.value)}>
@@ -97,7 +114,7 @@ const Register: React.FC = () => {
           <button type="submit" disabled={loading}>{loading ? 'Creating account...' : 'Create Account'}</button>
         </form>
 
-        <p className="signin-link">Already have an account? <a href="/login">Sign In</a></p>
+        <p className="signin-link">Already have an account? <Link to="/login">Sign In</Link></p>
       </main>
     </div>
   );

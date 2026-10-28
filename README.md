@@ -1,41 +1,48 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# KIND Service Platform
 
-# Run and deploy your AI Studio app
+KIND is a web application prototype for connecting clients with local service providers. The web frontend is built with React and Vite; the API uses Express and Supabase. The separate `expo-app` directory is currently an Expo starter scaffold.
 
-This contains everything you need to run your app locally.
+## Requirements
 
-View your app in AI Studio: https://ai.studio/apps/drive/1trkesBZoij5dXtXoqUP3dPd6gv4P4_1q
+- Node.js and npm
+- A Supabase project
 
-## Run Locally
+## Configure Supabase and the API
 
-**Prerequisites:**  Node.js
+1. In the Supabase SQL editor, run [`supabase_schema.sql`](./supabase_schema.sql).
+2. Copy `server/.env.example` to `server/.env`.
+3. Set the required server values:
+   - `JWT_SECRET`: a long, randomly generated signing secret.
+   - `SUPABASE_URL`: the project URL.
+   - `SUPABASE_SERVICE_ROLE_KEY`: the server-only service-role key. The API uses this key for database operations; never expose it to the browser.
+4. To provision an administrator, also set `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_NAME`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD`, then run `node create_admin.js` from `server/`. Keep the service-role key private.
+5. Optional features need their own credentials: Google/Facebook OAuth needs the matching client/app ID and secret; SMS needs the Africa's Talking API key and username, and can use `ADMIN_PHONE_NUMBER`.
 
+The API defaults to `http://localhost:4000`. It reads its environment file from `server/.env` whether started from the repository root or `server/`.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Run locally
 
-## Local API Server (registration)
+In one terminal, from the repository root:
 
-This project includes a minimal Express + SQLite server to handle user registration.
+```sh
+npm install
+npm run dev
+```
 
-1. Open a new terminal and change to the `server` folder:
+The Vite development server runs at `http://localhost:3000`.
 
-```powershell
+In another terminal:
+
+```sh
 cd server
 npm install
 npm start
 ```
 
-2. The server will start on `http://localhost:4000` and expose:
-- `POST /api/register` — register a new user (body: `{ name, email, password, role }`)
-- `GET /api/users` — list users
+Alternatively, start the API from the repository root with `npm run start:server`.
 
-- `POST /api/login` — login with `{ email, password }`, returns `{ token, role, name }`
-- `GET /api/me` — verify token from `Authorization: Bearer <token>` and return user info
+## Notes
 
-3. Keep the server running while using the frontend register form.
+- `server/legacy/` contains unused scripts for the old SQLite backend. The current API uses Supabase.
+- The provider and admin interfaces are works in progress; some UI actions call API routes that are not yet implemented.
+- See [`DOCUMENTATION.md`](./DOCUMENTATION.md) for architecture, configuration, and API details.
