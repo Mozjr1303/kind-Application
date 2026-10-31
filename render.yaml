@@ -32,12 +32,11 @@ services:
         sync: false
 
   # ---------------------------------------------------------------------------
-  # 2. Vite React Frontend Static Site (Served via global CDN, no region)
+  # 2. Vite React Frontend Static Site
   # ---------------------------------------------------------------------------
   - type: web
     name: kind-frontend
     runtime: static
-    plan: free
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
     routes:
