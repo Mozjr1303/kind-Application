@@ -1,0 +1,53 @@
+services:
+  # ---------------------------------------------------------------------------
+  # 1. Express Backend Web Service
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: kind-backend
+    runtime: node
+    plan: free
+    region: frankfurt
+    rootDir: server
+    buildCommand: npm install
+    startCommand: node index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ALLOWED_ORIGINS
+        fromService:
+          type: web
+          name: kind-frontend
+          property: host
+      - key: AFRICASTALKING_API_KEY
+        sync: false
+      - key: AFRICASTALKING_USERNAME
+        sync: false
+      - key: ADMIN_PHONE_NUMBER
+        sync: false
+
+  # ---------------------------------------------------------------------------
+  # 2. Vite React Frontend Static Site
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: kind-frontend
+    runtime: static
+    plan: free
+    region: frankfurt
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: kind-backend
+          property: host

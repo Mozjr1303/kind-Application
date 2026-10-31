@@ -123,9 +123,15 @@ function createApp({
 
   if (allowedOrigins.length === 0) throw new Error('ALLOWED_ORIGINS must contain at least one allowed origin.');
 
+  const normalizedAllowedOrigins = allowedOrigins.flatMap(item => {
+    if (!item) return [];
+    if (/^https?:\/\//i.test(item)) return [item];
+    return ['https://' + item, 'http://' + item, item];
+  });
+
   const corsMiddleware = cors({
     origin(origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+      if (!origin || normalizedAllowedOrigins.includes(origin)) return callback(null, true);
       return callback(new Error('Origin is not allowed by CORS.'));
     }
   });
